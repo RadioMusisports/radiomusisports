@@ -75,6 +75,8 @@
       <div id="loggedAs" style="display:none; margin-top: 15px;">
         👤 Connecté en : <span id="me" style="color:#ffcc00;"></span>
       </div>
+      <button id="logoutBtn" style="display:none; background:#ff6b6b; padding:10px;
+       border:none; border-radius:6px; color:white; cursor:pointer;">🚪 Déconnexion</button>
     </div>
   </header>
 
@@ -94,6 +96,7 @@
     const registerBtn = document.getElementById('registerBtn');
     const loggedArea = document.getElementById('loggedAs');
     const meSpan = document.getElementById('me');
+     
 
     function appendMsg(txt) {
       const p = document.createElement('p');
@@ -167,6 +170,7 @@
     socket.on('auth-failed', (msg) => {
       alert('⚠️ ' + msg);
     });
+
   </script>
 </body>
 </html>
