@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Quiz 24/24 — Radio Musi-Sports</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f0f1a;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+    header {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 2px solid #ff3366;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: #ffcc00;
+    }
+    input, button {
+      padding: 12px;
+      margin: 8px;
+      border-radius: 6px;
+      border: none;
+      font-size: 1rem;
+    }
+    button {
+      background: #ff3366;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #ff6699;
+    }
+    #messages {
+      background: #1a1a2e;
+      padding: 20px;
+      border-radius: 10px;
+      min-height: 400px;
+      max-height: 60vh;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+    #messages p {
+      margin: 8px 0;
+      padding: 8px;
+      background: #2a2a40;
+      border-radius: 6px;
+    }
+    #messages b {
+      color: #ffcc00;
+    }
+    button {
+      display: block;
+      width: 100%;
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎵 Quiz 24/24 — Radio Musi-Sports</h1>
+    <div id="auth-area">
+      <div id="auth-forms">
+        <input id="pseudoInput" placeholder="Pseudo" autocomplete="off">
+        <input id="passwordInput" type="password" placeholder="Mot de passe">
+        <button id="loginBtn">🔐 Se connecter</button>
+        <button id="registerBtn">📝 S'inscrire</button>
+      </div>
+      <div id="loggedAs" style="display:none; margin-top: 15px;">
+        👤 Connecté en : <span id="me" style="color:#ffcc00;"></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="quizArea">
+      <div id="messages"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const messages = document.getElementById('messages');
+    const pseudoInput = document.getElementById('pseudoInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const loggedArea = document.getElementById('loggedAs');
+    const meSpan = document.getElementById('me');
+
+    function appendMsg(txt) {
+      const p = document.createElement('p');
+      p.innerHTML = txt;
+      messages.appendChild(p);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    // Inscription
+    registerBtn.onclick = async () => {
+      const pseudo = pseudoInput.value.trim();
+      const password = passwordInput.value;
+      if (!pseudo || !password) { alert('Pseudo + mot de passe requis'); return; }
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pseudo, password })
+      });
+      const j = await res.json();
+      if (j.ok) {
+        alert('✅ Compte créé avec succès ! Connecte-toi maintenant.');
+      } else {
+        alert('❌ ' + (j.error || 'Erreur inconnue'));
+      }
+    };
+
+    // Connexion
+    loginBtn.onclick = async () => {
+      const pseudo = pseudoInput.value.trim();
+      const password = passwordInput.value;
+      if (!pseudo || !password) { alert('Pseudo + mot de passe requis'); return; }
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pseudo, password })
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        alert('❌ ' + (j.error || 'Erreur de connexion'));
+        return;
+      }
+
+      // Authentifier via Socket.IO
+      socket.emit('authenticate', pseudo);
+      meSpan.textContent = pseudo;
+      loggedArea.style.display = 'block';
+      document.getElementById('auth-forms').style.display = 'none';
+    };
+
+    // Réception des messages
+    socket.on('message', (m) => appendMsg(m));
+
+    // Réception des questions
+    socket.on('question', (q) => {
+      appendMsg(`<b>❓ ${q.question}</b>`);
+      const container = document.createElement('div');
+      q.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.textContent = opt;
+        btn.onclick = () => {
+          socket.emit('reponseQuiz', { index: q.index, choix: opt });
+          // Désactive les boutons après clic (UX)
+          Array.from(container.children).forEach(b => b.disabled = true);
+        };
+        container.appendChild(btn);
+      });
+      messages.appendChild(container);
+    });
+
+    // Gestion erreurs d'auth
+    socket.on('auth-failed', (msg) => {
+      alert('⚠️ ' + msg);
+    });
+  </script>
+</body>
+</html>

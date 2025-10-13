@@ -1,0 +1,17 @@
+{
+  "name": "radio-musi-sports",
+  "version": "1.0.0",
+  "description": "Quiz en direct avec authentification sécurisée",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.x"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "bcrypt": "^5.1.1"
+  }
+}
