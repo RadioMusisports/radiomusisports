@@ -22,25 +22,27 @@ async function loadUsers() {
     const raw = await fs.readFile(USERS_FILE, 'utf8');
     return JSON.parse(raw);
   } catch (e) {
-    return []; // si fichier manquant, retourne tableau vide
+    return [];
   }
 }
 
 async function saveUsers(users) {
   await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
 }
+
 async function loadScores() {
   try {
     const raw = await fs.readFile(SCORES_FILE, 'utf8');
     return JSON.parse(raw);
   } catch (e) {
-    return {}; // si fichier manquant, retourne objet vide
+    return {};
   }
 }
 
 async function saveScores(scores) {
   await fs.writeFile(SCORES_FILE, JSON.stringify(scores, null, 2));
 }
+
 // API d'inscription
 app.post('/api/register', async (req, res) => {
   const { pseudo, password } = req.body;
@@ -74,15 +76,10 @@ app.post('/api/login', async (req, res) => {
 
 // ===================== Socket.io =====================
 let socketsUser = {};    // socketId -> pseudo
-<<<<<<< HEAD
-let userSocket = {};     // pseudo -> socketId (empêcher double connexion)   
-let scores = {}; // initialisation vide
-=======
-let userSocket = {};     // pseudo -> socketId (empêcher double connexion)
-let scores = {}; // initialisation vide; 
->>>>>>> b93b6cecd94767d1eb2dd9ba7f963eff1a77bfdb
+let userSocket = {};     // pseudo -> socketId
+let scores = {};         // pseudo -> score
 
-// Quiz server-side (questions, timing)
+// Quiz server-side
 let questionsBank = [
   { question: "Qui chante 'Shape of You' ?", options: ["Ed Sheeran","Justin Bieber","Shawn Mendes","Drake"], correct: "Ed Sheeran" },
   { question: "Quel groupe a sorti 'The Dark Side of the Moon' ?", options: ["Pink Floyd","Queen","The Beatles","Nirvana"], correct: "Pink Floyd" },
@@ -114,33 +111,26 @@ let questionsBank = [
   { question: "Quel groupe a chanté ‘Wonderwall’ ?", options: ["Oasis","Blur","Radiohead","The Verve"], correct: "Oasis" },
   { question: "Quelle chanteuse a sorti ‘Anti’ en 2016 ?", options: ["Rihanna","Beyoncé","Alicia Keys","Solange"], correct: "Rihanna" },
   { question: "Qui a chanté ‘Happier Than Ever’ ?", options: ["Billie Eilish","Olivia Rodrigo","Lorde","Ariana Grande"], correct: "Billie Eilish" },
-  // ... tu peux en ajouter encore ici
 ];
 
-let roundQuestions = [];      // questions de la ronde actuelle
+let roundQuestions = [];
 let qIndex = 0;
 let quizRunning = false;
-let questionIntervalMs = 25_000; // 25 secondes entre chaque question
+let questionIntervalMs = 25_000;
 let questionTimer = null;
 
-// Fonction pour (re)démarrer une ronde de quiz — mélange les questions
 function startNewRound() {
   roundQuestions = shuffle([...questionsBank]);
   qIndex = 0;
-  // reset scores
   Object.keys(scores).forEach(p => scores[p] = 0);
   quizRunning = true;
   io.emit('message', '🔔 Nouveau quiz lancé !');
   sendQuestion();
-  // timer pour envoyer les questions périodiquement
   if (questionTimer) clearInterval(questionTimer);
   questionTimer = setInterval(() => {
     qIndex++;
-    if (qIndex >= roundQuestions.length) {
-      endRound();
-    } else {
-      sendQuestion();
-    }
+    if (qIndex >= roundQuestions.length) endRound();
+    else sendQuestion();
   }, questionIntervalMs);
 }
 
@@ -151,7 +141,7 @@ function sendQuestion() {
   io.sockets.sockets.forEach(s => s.answered = false);
 }
 
-function endRound() {
+async function endRound() {
   quizRunning = false;
   if (questionTimer) clearInterval(questionTimer);
   const entries = Object.entries(scores);
@@ -163,8 +153,9 @@ function endRound() {
     const winners = entries.filter(e => e[1] === topScore).map(e => e[0]);
     io.emit('message', `🏆 Gagnant(s) : ${winners.join(', ')} — score : ${topScore}`);
   }
-  await saveScores(scores); // sauvegarde après chaque ronde
+  await saveScores(scores);
 }
+
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random()*(i+1));
@@ -173,20 +164,12 @@ function shuffle(arr) {
   return arr;
 }
 
-// Redémarrage automatique à minuit
 setInterval(() => {
   const now = new Date();
   const hh = now.getHours();
   const mm = now.getMinutes();
-
-  if (hh === 23 && mm === 50) {
-    io.emit('message', '⏳ Résultats imminents...');
-    endRound();
-  }
-
-  if (hh === 0 && mm === 0) {
-    startNewRound();
-  }
+  if (hh === 23 && mm === 50) endRound();
+  if (hh === 0 && mm === 0) startNewRound();
 }, 60_000);
 
 // Socket logic
@@ -203,11 +186,11 @@ io.on('connection', (socket) => {
     if (!scores[pseudo]) scores[pseudo] = 0;
     io.emit('users', Object.values(socketsUser));
     socket.emit('auth-ok', 'Authentifié');
-
     if (!quizRunning) startNewRound();
-socket.on('requestLeaderboard', () => {
-  socket.emit('leaderboard', scores);
+  });
 
+  socket.on('requestLeaderboard', () => {
+    socket.emit('leaderboard', scores);
   });
 
   socket.on('chatMessage', (texte) => {
@@ -219,21 +202,17 @@ socket.on('requestLeaderboard', () => {
     const pseudo = socketsUser[socket.id];
     if (!pseudo || !quizRunning || socket.answered) return;
     socket.answered = true;
-
     const q = roundQuestions[data.index];
     if (!q) return;
-
     if (data.choix === q.correct) {
       scores[pseudo] = (scores[pseudo] || 0) + 1;
       io.emit('message', `✅ ${pseudo} a répondu correctement !`);
     } else {
       io.emit('message', `❌ ${pseudo} a répondu… (incorrect)`);
     }
-
     const allAnswered = Array.from(io.sockets.sockets.values())
       .filter(s => socketsUser[s.id])
       .every(s => s.answered);
-
     if (allAnswered) {
       qIndex++;
       if (qIndex >= roundQuestions.length) endRound();
@@ -252,14 +231,14 @@ socket.on('requestLeaderboard', () => {
   });
 });
 
-// 🔴 REDIRECTION IMPORTANTE : / → /quiz.html
+// Redirection racine
 app.get('/', (req, res) => {
   res.redirect('/quiz.html');
 });
 
 // Démarrage serveur
 (async () => {
-  scores = await loadScores(); // charge les scores persistants
+  scores = await loadScores();
   server.listen(PORT, () => {
     console.log(`🚀 Serveur lancé sur : http://localhost:${PORT}`);
   });
