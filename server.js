@@ -75,7 +75,7 @@ app.post('/api/login', async (req, res) => {
 // ===================== Socket.io =====================
 let socketsUser = {};    // socketId -> pseudo
 let userSocket = {};     // pseudo -> socketId (empêcher double connexion)
-let scores = await loadScores(); // charge les scores existants au démarrage; 
+let scores = {}; // initialisation vide; 
 
 // Quiz server-side (questions, timing)
 let questionsBank = [
